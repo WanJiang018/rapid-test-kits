@@ -1,14 +1,18 @@
 <template>
-  <div class="">
+  <div>
     <div
       class="header px-4 py-2 bg-white shadow d-flex flex-wrap align-items-center justify-content-center justify-content-lg-start"
     >
-      <h1 class="mb-0  me-lg-4 d-flex flex-column">
+      <h1 class="mb-0 me-lg-4 d-flex flex-column">
         <span class="text-lg-start text-center">
           <img src="@/assets/images/ic-test.png" class="me-2" width="25" />
           <span class="fs-4 fw-bold text-primary">找快篩</span>
         </span>
-        <a href="#" class="f-14 d-flex align-items-center">
+        <a
+          href="#"
+          class="f-14 d-flex align-items-center"
+          @click="showModal = true"
+        >
           <span class="material-symbols-outlined f-14 me-1"> info </span>
           <span>查看實名制領取快篩試劑說明</span>
         </a>
@@ -47,7 +51,6 @@
     <div class="main row gx-0">
       <!-- 列表 -->
       <div class="col-4 h-100 overflow-y-scroll d-lg-block d-none">
-        <!-- <button type="button" class="btn btn-primary text-white rounded-pill f-14 d-block ms-3 mt-3">實名制購買注意事項</button> -->
         <div v-if="selectedDatas.length > 0">
           <div class="card m-3" v-for="item in selectedDatas" :key="item">
             <div class="card-body">
@@ -119,6 +122,41 @@
       <div id="map" class="col-lg-8 col-12"></div>
     </div>
     <div class="bg-white"></div>
+    <transition name="modal-fade">
+      <div class="modal-backdrop" v-if="showModal">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+            <header class="modal-header">
+              <slot class="modal-title" name="header"
+                >實名制領取快篩試劑說明</slot
+              >
+            </header>
+
+            <section class="modal-body text-muted">
+              <ol class="mb-0">
+                <li>
+                  每身分證字號僅能購買 1 次 (可代購)，1 份 5 劑，每劑 100 元，共
+                  500 元
+                </li>
+                <li>身分證尾數單號：每週一、三、五領取</li>
+                <li>身分證尾數雙號：每週二、四、六領取</li>
+                <li>每週日所有民眾皆可領取</li>
+              </ol>
+            </section>
+
+            <footer class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-primary rounded-pill text-white px-5"
+                @click="showModal = false"
+              >
+                確定
+              </button>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -146,6 +184,10 @@ const icons = {
     iconUrl: require("@/assets/images/ic-location-red.png"),
     ...iconsConfig,
   }),
+  currentLocation: new L.Icon({
+    iconUrl: require("@/assets/images/ic-current-location.png"),
+    ...iconsConfig,
+  }),
 };
 
 export default {
@@ -153,6 +195,9 @@ export default {
   components: {},
   data() {
     return {
+      showModal: false,
+      userLat: 25.03,
+      userLong: 121.55,
       datas: [],
       selectedDatas: [],
       cityName,
@@ -164,25 +209,40 @@ export default {
     };
   },
   mounted() {
-    // OSM
-    osmMap = L.map("map", {
-      center: [25.03, 121.55],
-      zoom: 15,
-    });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '<a target="_blank" href="https://www.openstreetmap.org/">© OpenStreetMap 貢獻者</a>',
-      maxZoom: 18,
-    }).addTo(osmMap);
-
-    const route =
-      "https://data.nhi.gov.tw/Datasets/Download.ashx?rid=A21030000I-D03001-001&l=https://data.nhi.gov.tw/resource/Nhi_Fst/Fstdata.csv";
-    this.axios.get(route).then((response) => {
-      this.datas = this.convertCSVToJson(response.data);
-      this.updateMarker();
-    });
+    this.setUserPosition();
+    this.initMap();
+    this.getDatas();
+    this.setUserCityArea();
   },
   methods: {
+    initMap() {
+      osmMap = L.map("map", {
+        center: [this.userLat, this.userLong],
+        zoom: 15,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution:
+          '<a target="_blank" href="https://www.openstreetmap.org/">© OpenStreetMap 貢獻者</a>',
+        maxZoom: 18,
+      }).addTo(osmMap);
+    },
+    getDatas() {
+      const route =
+        "https://data.nhi.gov.tw/Datasets/Download.ashx?rid=A21030000I-D03001-001&l=https://data.nhi.gov.tw/resource/Nhi_Fst/Fstdata.csv";
+      this.axios.get(route).then((response) => {
+        this.datas = this.convertCSVToJson(response.data);
+        this.updateMarker();
+      });
+    },
+    setUserCityArea() {
+      const route = `https://api.nlsc.gov.tw/other/TownVillagePointQuery/${this.userLong}/${this.userLat}/4326`;
+      this.axios.get(route).then((response) => {
+        this.select.city = response.data.ctyName;
+        this.select.area = response.data.townName;
+        this.updateMarker();
+      });
+    },
     convertCSVToJson(csv) {
       const lines = csv.split("\n");
       const header = lines[0].split(",");
@@ -293,6 +353,22 @@ export default {
         return -1;
       }
       return 0;
+    },
+    setUserPosition() {
+      if (navigator.geolocation) {
+        var showPosition = (position) => {
+          this.userLat = position.coords.latitude;
+          this.userLong = position.coords.longitude;
+          osmMap.setView([this.userLat, this.userLong], 16);
+          const icon = icons.currentLocation;
+          L.marker([this.userLat, this.userLong], { icon }).addTo(osmMap);
+        };
+
+        var showError = () => alert("抱歉，現在無法取的您的地理位置。");
+        navigator.geolocation.getCurrentPosition(showPosition, showError);
+      } else {
+        alert("抱歉，您的裝置不支援定位功能。");
+      }
     },
   },
 };
