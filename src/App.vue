@@ -52,7 +52,7 @@
       <!-- 列表 -->
       <div class="col-4 h-100 overflow-y-scroll d-lg-block d-none">
         <div v-if="selectedDatas.length > 0">
-          <p class="text-danger f-14 fw-bold mt-3 mx-3">※ 可能會發生藥局沒有更新快篩試劑數量的情況，請注意「備註」或與打電話至藥局確認是否仍有快篩試劑。</p>
+          <p class="text-danger f-14 fw-bold mt-3 mx-3">※ 可能會發生藥局沒有更新快篩試劑數量的情況，請注意「備註」或打電話至藥局確認是否仍有快篩試劑。</p>
           <div class="card m-3" v-for="item in selectedDatas" :key="item">
             <div class="card-body">
               <h5
@@ -265,6 +265,7 @@ export default {
     },
     updateSelect() {
       this.removeMarker();
+      this.setUserMarker();
       this.updateMarker();
 
       if (
@@ -380,10 +381,7 @@ export default {
           this.userLat = position.coords.latitude;
           this.userLong = position.coords.longitude;
           this.setUserCityArea();
-
-          osmMap.setView([this.userLat, this.userLong], 16);
-          const icon = icons.currentLocation;
-          L.marker([this.userLat, this.userLong], { icon }).addTo(osmMap);
+          this.setUserMarker();
         };
 
         var showError = () => alert("抱歉，現在無法取的您的地理位置。");
@@ -392,6 +390,11 @@ export default {
         alert("抱歉，您的裝置不支援定位功能。");
       }
     },
+    setUserMarker(){
+      osmMap.setView([this.userLat, this.userLong], 16);
+      const icon = icons.currentLocation;
+      L.marker([this.userLat, this.userLong], { icon }).addTo(osmMap);
+    }
   },
 };
 </script>
