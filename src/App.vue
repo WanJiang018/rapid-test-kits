@@ -4,17 +4,17 @@
       class="header px-4 py-2 bg-white shadow d-flex flex-wrap align-items-center justify-content-center justify-content-lg-start"
     >
       <h1 class="mb-0 me-lg-4 d-flex flex-column">
-        <span class="text-lg-start text-center">
+        <span class="text-lg-start text-center mb-1 mb-lg-0">
           <img src="@/assets/images/ic-test.png" class="me-2" width="25" />
           <span class="fs-4 fw-bold text-primary">找快篩</span>
         </span>
         <a
           href="#"
-          class="f-14 d-flex align-items-center"
+          class="f-14 d-flex align-items-center text-secondary"
           @click="showModal = true"
         >
           <span class="material-symbols-outlined f-14 me-1"> info </span>
-          <span>查看實名制領取快篩試劑說明</span>
+          <span>點我查看實名制領取快篩試劑說明</span>
         </a>
       </h1>
       <div class="me-lg-3 select">
@@ -52,6 +52,7 @@
       <!-- 列表 -->
       <div class="col-4 h-100 overflow-y-scroll d-lg-block d-none">
         <div v-if="selectedDatas.length > 0">
+          <p class="text-danger f-14 fw-bold mt-3 mx-3">※ 可能會發生藥局沒有更新快篩數量的情況，請注意「備註」或與打電話至藥局確認是否仍有快篩試劑。</p>
           <div class="card m-3" v-for="item in selectedDatas" :key="item">
             <div class="card-body">
               <h5
@@ -105,9 +106,7 @@
                   {{ item["醫事機構電話"] }}
                 </p>
                 <p class="mb-2 d-flex align-items-center">
-                  <span class="material-symbols-outlined fs-5 me-2">
-                    description </span
-                  >{{ item["備註"] }}
+                  備註：{{ item["備註"] }}
                 </p>
                 <small class="text-muted"
                   >來源資料時間: {{ item["來源資料時間"] }}</small
@@ -190,6 +189,9 @@ const icons = {
   }),
 };
 
+const defaultCity = "臺北市";
+const defaultArea = "大安區";
+
 export default {
   name: "App",
   components: {},
@@ -203,8 +205,8 @@ export default {
       cityName,
       osmMap: {},
       select: {
-        city: "請選擇縣市",
-        area: "",
+        city: defaultCity,
+        area: defaultArea,
       },
     };
   },
@@ -212,7 +214,6 @@ export default {
     this.setUserPosition();
     this.initMap();
     this.getDatas();
-    this.setUserCityArea();
   },
   methods: {
     initMap() {
@@ -237,9 +238,10 @@ export default {
     },
     setUserCityArea() {
       const route = `https://api.nlsc.gov.tw/other/TownVillagePointQuery/${this.userLong}/${this.userLat}/4326`;
+      console.log(route);
       this.axios.get(route).then((response) => {
-        this.select.city = response.data.ctyName;
-        this.select.area = response.data.townName;
+        this.select.city = response.data.ctyName ?? defaultCity;
+        this.select.area = response.data.townName ?? defaultArea;
         this.updateMarker();
       });
     },
@@ -264,11 +266,38 @@ export default {
     updateSelect() {
       this.removeMarker();
       this.updateMarker();
+
+      if (
+        this.selectedDatas.length == 0 &&
+        this.select.city &&
+        this.select.city != "請選擇縣市" &&
+        this.select.area &&
+        this.select.area != "請選擇地區"
+      ) {
+        alert("抱歉，目前沒有此地區的快篩試劑資料");
+      } else {
+        const firstData = this.selectedDatas[0];
+        const longitude = firstData["經度"];
+        const latitude = firstData["緯度"];
+        osmMap.setView([latitude, longitude], 16);
+      }
     },
     updateMarker() {
       this.selectedDatas = this.filterPharmacyDatas();
-      this.selectedDatas.sort(this.compare);
-      this.addMapMarker();
+      if (this.selectedDatas.length > 0) {
+        this.selectedDatas.sort(this.compare);
+        this.selectedDatas.forEach((item) => {
+          const mapMarkerData = this.getMapMarkerData(item);
+          const icon = mapMarkerData.icon;
+          if (mapMarkerData) {
+            L.marker([mapMarkerData.latitude, mapMarkerData.longitude], {
+              icon,
+            })
+              .addTo(osmMap)
+              .bindPopup(mapMarkerData.template);
+          }
+        });
+      }
     },
     removeMarker() {
       osmMap.eachLayer((layer) => {
@@ -280,16 +309,11 @@ export default {
     filterPharmacyDatas() {
       return this.datas.filter((item) => {
         if (item["醫事機構地址"]) {
-          var cityIsValid =
-            this.select.city != "請選擇縣市" && this.select.city != "";
-          var areaIsValid =
-            this.select.area != "請選擇地區" && this.select.area != "";
-
-          if (cityIsValid) {
+          if (this.select.city && this.select.city != "請選擇縣市") {
             const address = item["醫事機構地址"].toString();
 
             if (address.startsWith(this.select.city)) {
-              if (areaIsValid) {
+              if (this.select.area && this.select.area != "請選擇地區") {
                 const addressWithoutCity = address.replace(
                   this.select.city,
                   ""
@@ -305,33 +329,29 @@ export default {
         }
       });
     },
-    addMapMarker() {
-      this.selectedDatas.forEach((item, index) => {
-        if (item && item["經度"] && item["緯度"]) {
-          const longitude = item["經度"].toString();
-          const latitude = item["緯度"].toString();
-          const num = parseInt(item["快篩試劑截至目前結餘存貨數量"]);
+    getMapMarkerData(item) {
+      if (item && item["經度"] && item["緯度"]) {
+        const name = item["醫事機構名稱"];
+        const address = item["醫事機構地址"];
+        const tel = item["醫事機構電話"];
+        const comment = item["備註"];
+        const dataTime = item["來源資料時間"];
+        const longitude = item["經度"];
+        const latitude = item["緯度"];
+        const num = parseInt(item["快篩試劑截至目前結餘存貨數量"]);
 
-          const template = `<strong>${item["醫事機構名稱"]}</strong><br>
+        const template = `<strong>${name}</strong><br>
                             快篩試劑剩餘：<strong>${num}</strong><br>
-                            地址：<a href="https://www.google.com.tw/maps/place/${item["醫事機構地址"]}" target="_blank">${item["醫事機構地址"]}</a><br>
-                            電話: ${item["醫事機構電話"]}<br>
-                            備註：${item["備註"]}<br>
-                            <small>來源資料時間: ${item["來源資料時間"]}</small>`;
+                            地址：<a href="https://www.google.com.tw/maps/place/${address}" target="_blank">${address}</a><br>
+                            電話: ${tel}<br>
+                            備註：${comment}<br>
+                            <small>來源資料時間: ${dataTime}</small>`;
 
-          const icon = this.getMapMarkerIcon(num);
+        const icon = this.getMapMarkerIcon(num);
 
-          if (index == 0) {
-            L.marker([latitude, longitude], { icon })
-              .addTo(osmMap)
-              .bindPopup(template)
-              .openPopup();
-          }
-          L.marker([latitude, longitude], { icon })
-            .addTo(osmMap)
-            .bindPopup(template);
-        }
-      });
+        return { latitude, longitude, icon, template };
+      }
+      return null;
     },
     getMapMarkerIcon(num) {
       var icon = icons.yellow;
@@ -359,6 +379,8 @@ export default {
         var showPosition = (position) => {
           this.userLat = position.coords.latitude;
           this.userLong = position.coords.longitude;
+          this.setUserCityArea();
+
           osmMap.setView([this.userLat, this.userLong], 16);
           const icon = icons.currentLocation;
           L.marker([this.userLat, this.userLong], { icon }).addTo(osmMap);
