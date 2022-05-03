@@ -52,7 +52,7 @@
       <!-- 列表 -->
       <div class="col-4 h-100 overflow-y-scroll d-lg-block d-none">
         <div v-if="selectedDatas.length > 0">
-          <p class="text-danger f-14 fw-bold mt-3 mx-3">※ 可能會發生藥局沒有更新快篩數量的情況，請注意「備註」或與打電話至藥局確認是否仍有快篩試劑。</p>
+          <p class="text-danger f-14 fw-bold mt-3 mx-3">※ 可能會發生藥局沒有更新快篩試劑數量的情況，請注意「備註」或與打電話至藥局確認是否仍有快篩試劑。</p>
           <div class="card m-3" v-for="item in selectedDatas" :key="item">
             <div class="card-body">
               <h5
