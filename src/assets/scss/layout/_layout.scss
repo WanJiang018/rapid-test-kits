@@ -7,17 +7,25 @@ body {
     font-family: "Arial", "Helvetica", "微軟正黑體", "DFHei", "Microsoft JhengHei", "sans-serif";
     letter-spacing: 0.06em;
 }
-
 .main {
-    height: calc(100vh - 100px);
+    height: 100%;
+}
+@media (min-width: 992px) {
+    .main {
+        height: calc(100vh - 160px - 20px);
+    }
+}
+
+#map {
+    height: calc(100vh - 160px - 20px);
 }
 
 .header {
-    height: 150px;
+    height: 160px;
 }
 @media (min-width: 992px) {
     .header {
-        height: 80px;
+        height: 100px;
     }
 }
 
@@ -35,4 +43,11 @@ body {
 }
 .f-14 {
     font-size: 14px !important;
+}
+
+.aboveMap {
+    z-index: 9999;
+    position: absolute;
+    top: 20px;
+    left: calc(50% - 145px / 2);
 }

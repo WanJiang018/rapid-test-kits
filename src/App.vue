@@ -3,7 +3,7 @@
     <div
       class="header px-4 py-2 bg-white shadow d-flex flex-wrap align-items-center justify-content-center justify-content-lg-start"
     >
-      <h1 class="mb-0 me-lg-4 d-flex flex-column">
+      <h1 class="mb-2 mb-lg-0 me-lg-4 d-flex flex-column">
         <span class="text-lg-start text-center mb-1 mb-lg-0">
           <img src="@/assets/images/ic-test.png" class="me-2" width="25" />
           <span class="fs-4 fw-bold text-primary">找快篩</span>
@@ -17,7 +17,7 @@
           <span>點我查看實名制領取快篩試劑說明</span>
         </a>
       </h1>
-      <div class="me-lg-3 select">
+      <div class="mb-2 mb-lg-0 me-lg-3 select">
         <select
           id="cityName"
           class="form-control"
@@ -48,12 +48,28 @@
         </select>
       </div>
     </div>
+    <div>
+      <p class="text-danger f-14 fw-bold mt-3 mx-3">
+        ※可能會發生藥局沒有更新快篩試劑數量的情況，請注意「備註」或打電話至藥局確認是否仍有快篩試劑。
+      </p>
+    </div>
+    <!-- 切換地圖/列表 -->
+    <div class="my-3 text-center" v-if="!showMap">
+      <button class="btn btn-secondary f-14" @click="showMapHandler">
+        <div class="d-flex align-items-center">
+          <span class="material-symbols-outlined me-1"> map </span>
+          <span>切換地圖模式</span>
+        </div>
+      </button>
+    </div>
     <div class="main row gx-0">
       <!-- 列表 -->
-      <div class="col-4 h-100 overflow-y-scroll d-lg-block d-none">
+      <div
+        class="list-container col-12 col-lg-4 h-100 overflow-y-scroll d-lg-block"
+        :class="{ 'd-none': showMap }"
+      >
         <div v-if="selectedDatas.length > 0">
-          <p class="text-danger f-14 fw-bold mt-3 mx-3">※ 可能會發生藥局沒有更新快篩試劑數量的情況，請注意「備註」或打電話至藥局確認是否仍有快篩試劑。</p>
-          <div class="card m-3" v-for="item in selectedDatas" :key="item">
+          <div class="card mx-3 mb-3" v-for="item in selectedDatas" :key="item">
             <div class="card-body">
               <h5
                 class="card-title d-flex justify-content-between align-items-center mb-3"
@@ -61,7 +77,7 @@
                 <span>{{ item["醫事機構名稱"] }}</span>
                 <div
                   v-if="item['快篩試劑截至目前結餘存貨數量'] >= 40"
-                  class="bg-primary text-white rounded p-2 text-center fs-6 d-flex align-items-center"
+                  class="bg-primary text-white rounded-3 p-2 text-center f-14 d-flex align-items-center"
                 >
                   <small>快篩試劑剩餘：</small>
                   <span class="fs-5">{{
@@ -70,7 +86,7 @@
                 </div>
                 <div
                   v-else-if="item['快篩試劑截至目前結餘存貨數量'] <= 15"
-                  class="bg-danger text-white rounded p-2 text-center fs-6 d-flex align-items-center"
+                  class="bg-danger text-white rounded-3 p-2 text-center f-14 d-flex align-items-center"
                 >
                   <small>快篩試劑剩餘：</small>
                   <span class="fs-5">{{
@@ -79,7 +95,7 @@
                 </div>
                 <div
                   v-else
-                  class="bg-warning text-white rounded p-2 text-center fs-6 d-flex align-items-center"
+                  class="bg-warning text-white rounded-3 p-2 text-center f-14 d-flex align-items-center"
                 >
                   <small>快篩試劑剩餘：</small>
                   <span class="fs-5">{{
@@ -115,10 +131,22 @@
             </div>
           </div>
         </div>
-        <div v-else class="text-muted pt-3 text-center">尚無資料</div>
+        <div v-else class="text-muted pt-3 text-center">{{ listText }}</div>
       </div>
       <!-- 地圖 -->
-      <div id="map" class="col-lg-8 col-12"></div>
+      <div class="col-lg-8 col-12" :class="{ 'd-none': !showMap }">
+        <div id="map">
+          <button
+            class="btn btn-secondary f-14 aboveMap d-lg-none"
+            @click="showMap = false"
+          >
+            <div class="d-flex align-items-center">
+              <span class="material-symbols-outlined me-1"> list </span>
+              <span>切換列表模式</span>
+            </div>
+          </button>
+        </div>
+      </div>
     </div>
     <div class="bg-white"></div>
     <transition name="modal-fade">
@@ -197,6 +225,8 @@ export default {
   components: {},
   data() {
     return {
+      listText: "載入資料中...",
+      showMap: true,
       showModal: false,
       userLat: 25.03,
       userLong: 121.55,
@@ -264,6 +294,7 @@ export default {
       this.updateSelect();
     },
     updateSelect() {
+      this.listText = "載入資料中...";
       this.removeMarker();
       this.setUserMarker();
       this.updateMarker();
@@ -275,6 +306,7 @@ export default {
         this.select.area &&
         this.select.area != "請選擇地區"
       ) {
+        this.listText = "尚無資料";
         alert("抱歉，目前沒有此地區的快篩試劑資料");
       } else {
         const firstData = this.selectedDatas[0];
@@ -390,11 +422,14 @@ export default {
         alert("抱歉，您的裝置不支援定位功能。");
       }
     },
-    setUserMarker(){
+    setUserMarker() {
       osmMap.setView([this.userLat, this.userLong], 16);
       const icon = icons.currentLocation;
       L.marker([this.userLat, this.userLong], { icon }).addTo(osmMap);
-    }
+    },
+    showMapHandler() {
+      this.showMap = true;
+    },
   },
 };
 </script>
